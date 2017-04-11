@@ -290,7 +290,7 @@ void CudaInitialize(vtkMatrix4x4* i_gridMatrix, // Matrix to transform grid voxe
 {
   TypeCompute* h_gridMatrix = new TypeCompute[SizeMat4x4];
   vtkMatrixToTypeComputeTable(i_gridMatrix, h_gridMatrix);
-  double h_unobservedValue = std::numeric_limits<double>::infinity();
+  double h_unobservedValue = std::numeric_limits<double>::max();
 
   cudaMemcpyToSymbol(c_gridMatrix, h_gridMatrix, SizeMat4x4 * sizeof(TypeCompute));
   cudaMemcpyToSymbol(c_gridDims, h_gridDims, SizeDim3D * sizeof(int));
