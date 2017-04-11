@@ -130,7 +130,7 @@ int vtkCudaReconstructionFilter::RequestData(
   outScalar->SetName("reconstruction_scalar");
   outScalar->SetNumberOfComponents(1);
   outScalar->SetNumberOfTuples(inGrid->GetNumberOfCells());
-  outScalar->FillComponent(0, 0);
+  outScalar->FillComponent(0, std::numeric_limits<double>::infinity());
   outGrid->ShallowCopy(inGrid);
   outGrid->GetCellData()->AddArray(outScalar.Get());
 

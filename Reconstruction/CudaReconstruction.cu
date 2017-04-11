@@ -37,6 +37,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <vector>
+#include <limits>
 
 // VTK includes
 #include "vtkPointData.h"
@@ -61,6 +62,7 @@ __constant__ TypeCompute c_rayPotentialThick; // Thickness threshold for the ray
 __constant__ TypeCompute c_rayPotentialRho; // Rho at the Y axis for the ray potential function
 __constant__ TypeCompute c_rayPotentialEta;
 __constant__ TypeCompute c_rayPotentialDelta;
+__constant__ TypeCompute c_unobservedValue; // value in the volume at unobserved voxels
 int ch_gridDims[3];
 
 // ----------------------------------------------------------------------------
@@ -112,7 +114,7 @@ __device__ void rayPotential(TypeCompute realDistance, TypeCompute depthMapDista
   int sign = diff != 0 ? diff / absoluteDiff : 0;
 
   if (absoluteDiff > c_rayPotentialDelta)
-    res = diff > 0 ? 0 : - c_rayPotentialEta * c_rayPotentialRho;
+    res = diff > 0 ? c_unobservedValue : - c_rayPotentialEta * c_rayPotentialRho;
   else if (absoluteDiff > c_rayPotentialThick)
     res = c_rayPotentialRho * sign;
   else
@@ -208,7 +210,17 @@ __global__ void depthMapKernel(TypeCompute* depths, TypeCompute matrixK[SizeMat4
   TVolumetric newValue;
   rayPotential<TVolumetric>(realDepth, depth, newValue);
   // Update the value to the output
-  output[gridId] += newValue;
+  if (newValue != c_unobservedValue)
+    {
+    if (output[gridId] == c_unobservedValue)
+      {
+      output[gridId] = newValue;
+      }
+    else
+      {
+      output[gridId] += newValue;
+      }
+    }
 }
 
 
@@ -278,6 +290,7 @@ void CudaInitialize(vtkMatrix4x4* i_gridMatrix, // Matrix to transform grid voxe
 {
   TypeCompute* h_gridMatrix = new TypeCompute[SizeMat4x4];
   vtkMatrixToTypeComputeTable(i_gridMatrix, h_gridMatrix);
+  double h_unobservedValue = std::numeric_limits<double>::infinity();
 
   cudaMemcpyToSymbol(c_gridMatrix, h_gridMatrix, SizeMat4x4 * sizeof(TypeCompute));
   cudaMemcpyToSymbol(c_gridDims, h_gridDims, SizeDim3D * sizeof(int));
@@ -287,6 +300,7 @@ void CudaInitialize(vtkMatrix4x4* i_gridMatrix, // Matrix to transform grid voxe
   cudaMemcpyToSymbol(c_rayPotentialRho, &h_rayPRho, sizeof(TypeCompute));
   cudaMemcpyToSymbol(c_rayPotentialEta, &h_rayPEta, sizeof(TypeCompute));
   cudaMemcpyToSymbol(c_rayPotentialDelta, &h_rayPDelta, sizeof(TypeCompute));
+  cudaMemcpyToSymbol(c_unobservedValue, &h_unobservedValue, sizeof(TypeCompute));
   cudaMemcpyToSymbol(c_depthMapDims, h_depthMapDims, 2 * sizeof(int));
 
   ch_gridDims[0] = h_gridDims[0];
